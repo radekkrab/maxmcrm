@@ -1,0 +1,45 @@
+models:
+  Product:
+    id: id
+    name: string
+    price: float
+
+  Warehouse:
+    id: id
+    name: string
+
+  Order:
+    id: id
+    customer: string
+    completed_at: timestamp nullable
+    status: enum:active,completed,canceled
+    warehouse_id: id
+    relationships:
+      belongsTo: Warehouse
+      hasMany: OrderItem
+
+  OrderItem:
+    id: id
+    order_id: id
+    product_id: id
+    count: integer
+    relationships:
+      belongsTo: Order, Product
+
+  Stock:
+    product_id: id
+    warehouse_id: id
+    stock: integer
+    relationships:
+      belongsTo: Product, Warehouse
+
+controllers:
+  WarehouseController:
+    resource: api
+
+  ProductController:
+    resource: api
+
+  OrderController:
+    resource: api
+
