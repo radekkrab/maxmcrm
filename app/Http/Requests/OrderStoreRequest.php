@@ -20,12 +20,13 @@ class OrderStoreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'customer' => ['required', 'string'],
-            'warehouse_id' => ['required', 'integer', 'exists:Warehouses,id'],
-            'customer' => ['required', 'string'],
-            'completed_at' => ['nullable'],
+            'customer' => ['required', 'string', 'max:255'],
+            'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
             'status' => ['required', 'in:active,completed,canceled'],
-            'warehouse_id' => ['required', 'integer', 'exists:Warehouses,id'],
+            'completed_at' => ['nullable', 'date'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.count' => ['required', 'integer', 'min:1']
         ];
     }
 }
