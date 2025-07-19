@@ -22,6 +22,7 @@ class OrderUpdateRequest extends FormRequest
         return [
             'customer' => 'sometimes|string|max:255',
             'warehouse_id' => 'sometimes|integer|exists:warehouses,id',
+            'status' => 'prohibited',
             'items' => 'sometimes|array|min:1',
             'items.*.product_id' => 'required_with:items|integer|exists:products,id',
             'items.*.count' => 'required_with:items|integer|min:1'
