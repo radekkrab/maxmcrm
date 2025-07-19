@@ -1,0 +1,36 @@
+created:
+    - app/Http/Controllers/WarehouseController.php
+    - app/Http/Controllers/ProductController.php
+    - app/Http/Controllers/OrderController.php
+    - database/factories/ProductFactory.php
+    - database/factories/WarehouseFactory.php
+    - database/factories/OrderFactory.php
+    - database/factories/OrderItemFactory.php
+    - database/factories/StockFactory.php
+    - database/migrations/2025_07_19_070101_create_products_table.php
+    - database/migrations/2025_07_19_070102_create_warehouses_table.php
+    - database/migrations/2025_07_19_070103_create_orders_table.php
+    - database/migrations/2025_07_19_070104_create_order_items_table.php
+    - database/migrations/2025_07_19_070105_create_stocks_table.php
+    - app/Models/Product.php
+    - app/Models/Warehouse.php
+    - app/Models/Order.php
+    - app/Models/OrderItem.php
+    - app/Models/Stock.php
+    - tests/Feature/Http/Controllers/WarehouseControllerTest.php
+    - tests/Feature/Http/Controllers/ProductControllerTest.php
+    - tests/Feature/Http/Controllers/OrderControllerTest.php
+    - app/Http/Requests/ProductStoreRequest.php
+    - app/Http/Requests/ProductUpdateRequest.php
+    - app/Http/Resources/ProductCollection.php
+    - app/Http/Resources/ProductResource.php
+    - app/Http/Resources/OrderCollection.php
+    - app/Http/Resources/OrderResource.php
+updated:
+    - routes/api.php
+models:
+    Product: { id: id, name: string, price: float }
+    Warehouse: { id: id, name: string }
+    Order: { id: id, customer: string, completed_at: 'timestamp nullable', status: 'enum:active,completed,canceled', warehouse_id: id, relationships: { belongsTo: Warehouse, hasMany: OrderItem } }
+    OrderItem: { id: id, order_id: id, product_id: id, count: integer, relationships: { belongsTo: 'Order, Product' } }
+    Stock: { product_id: id, warehouse_id: id, stock: integer, relationships: { belongsTo: 'Product, Warehouse' } }
