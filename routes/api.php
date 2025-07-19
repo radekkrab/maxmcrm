@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 
+Route::get('products/stocks', [App\Http\Controllers\ProductController::class, 'stocks']);
 
 Route::apiResource('warehouses', App\Http\Controllers\WarehouseController::class);
 
