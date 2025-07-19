@@ -13,7 +13,7 @@ localhost:80/api/warehouses
 localhost:80/api/products/stocks
 
 Получить список заказов (с фильтрами и настраиваемой пагинацией):
-
+GET localhost:80/api/orders?status=completed&warehouse_id=2&customer=Иван&date_from=2023-01-01&per_page=10
 
 Создать заказ (в заказе может быть несколько позиций с разным количеством):
 localhost:80/api/orders
@@ -34,6 +34,7 @@ localhost:80/api/orders
 }
 
 Обновить заказ (данные покупателя и список позиций, но не статус)
+
 Завершить заказ
 Отменить заказ
 Возобновить заказ (перевод из отмены в работу)
