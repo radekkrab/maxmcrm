@@ -12,6 +12,10 @@ use Illuminate\Http\Response;
 
 class OrderController extends Controller
 {
+    /**
+     * @param Request $request
+     * @return OrderCollection
+     */
     public function index(Request $request): OrderCollection
     {
         $orders = Order::all();
