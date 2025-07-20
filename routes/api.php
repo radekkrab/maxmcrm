@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 
+Route::get('/stock-movements', [App\Http\Controllers\StockMovementController::class, 'index']);
+
 Route::get('products/stocks', [App\Http\Controllers\ProductController::class, 'stocks']);
 
 Route::put('/orders/{order}/complete', [App\Http\Controllers\OrderController::class, 'complete']);
