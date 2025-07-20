@@ -7,6 +7,8 @@ use App\Exceptions\OrderRestoreException;
 use App\Models\Order;
 use App\Exceptions\OrderCompletionException;
 use App\Models\Stock;
+use App\Models\StockMovement;
+use Blueprint\Models\Model;
 use Illuminate\Support\Facades\DB;
 
 class OrderService
@@ -63,6 +65,15 @@ class OrderService
             }
 
             $stock->decrement('stock', $item->count);
+
+            // Добавляем запись о движении
+            $this->recordStockMovement(
+                $stock,
+                -$item->count, // Отрицательное значение для списания
+                'order_completion',
+                $order,
+                "Завершение заказа #{$order->id}"
+            );
         }
     }
 
@@ -120,9 +131,20 @@ class OrderService
     protected function returnItemsToStock(Order $order): void
     {
         foreach ($order->items as $item) {
-            Stock::where('product_id', $item->product_id)
+            $stock = Stock::where('product_id', $item->product_id)
                 ->where('warehouse_id', $order->warehouse_id)
-                ->increment('stock', $item->count);
+                ->firstOrFail();
+
+            $stock->increment('stock', $item->count);
+
+            // Добавляем запись о движении
+            $this->recordStockMovement(
+                $stock,
+                $item->count, // Положительное значение для возврата
+                'order_cancellation',
+                $order,
+                "Отмена завершенного заказа #{$order->id}"
+            );
         }
     }
 
@@ -169,9 +191,20 @@ class OrderService
     protected function deductItemsFromStock(Order $order): void
     {
         foreach ($order->items as $item) {
-            Stock::where('product_id', $item->product_id)
+            $stock = Stock::where('product_id', $item->product_id)
                 ->where('warehouse_id', $order->warehouse_id)
-                ->decrement('stock', $item->count);
+                ->firstOrFail();
+
+            $stock->decrement('stock', $item->count);
+
+            // Добавляем запись о движении
+            $this->recordStockMovement(
+                $stock,
+                -$item->count, // Отрицательное значение для списания
+                'order_restoration',
+                $order,
+                "Возобновление заказа #{$order->id}"
+            );
         }
     }
 
@@ -181,6 +214,24 @@ class OrderService
             'status' => 'active',
             'canceled_at' => null,
             'completed_at' => null
+        ]);
+    }
+
+    private function recordStockMovement(
+        Stock $stock,
+        int $amount,
+        string $operationType,
+        Model $source,
+        ?string $reason = null
+    ): void {
+        StockMovement::create([
+            'stock_id' => $stock->id,
+            'amount' => $amount,
+            'operation_type' => $operationType,
+            'source_type' => get_class($source),
+            'source_id' => $source->id,
+            'reason' => $reason,
+            'user_id' => auth()->id()
         ]);
     }
 }

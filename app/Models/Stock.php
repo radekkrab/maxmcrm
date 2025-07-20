@@ -44,4 +44,9 @@ class Stock extends Model
     {
         return $this->belongsTo(Warehouse::class);
     }
+
+    public function movements(): HasMany
+    {
+        return $this->hasMany(StockMovement::class);
+    }
 }
