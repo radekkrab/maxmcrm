@@ -13,12 +13,16 @@ use App\Http\Resources\OrderCollection;
 use App\Http\Resources\OrderResource;
 use App\Models\Order;
 use App\Models\Stock;
+use App\Services\OrderService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
+    public function __construct(
+        private OrderService $orderService
+    ) {}
     /**
      * Получить список заказов с пагинацией и фильтрацией
      *
@@ -133,180 +137,39 @@ class OrderController extends Controller
     }
 
     /**
-     * Завершить заказ
+     * Завершение заказа
      *
-     * Переводит заказ в статус 'completed' и фиксирует дату завершения.
-     * Перед завершением проверяет:
-     * - Что заказ находится в активном статусе
-     * - Что все товары в наличии на складе
-     *
-     * @param Order $order Модель заказа для завершения
-     * @return OrderResource Ресурс завершенного заказа
-     *
-     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
-     * @throws \App\Exceptions\OrderCompletionException При невозможности завершить заказ
-     *
-     * @response {
-     *   "data": {
-     *     "id": 1,
-     *     "status": "completed",
-     *     "completed_at": "2023-05-20T14:30:00Z",
-     *     ...
-     *   }
-     * }
+     * @param Order $order
+     * @return OrderResource
      */
     public function complete(Order $order): OrderResource
     {
-        if ($order->status !== 'active') {
-            throw new OrderCompletionException('Можно завершать только активные заказы');
-        }
+        $this->orderService->completeOrder($order);
 
-        DB::transaction(function () use ($order) {
-            // Проверяем наличие товаров
-            foreach ($order->items as $item) {
-                $stock = Stock::where('product_id', $item->product_id)
-                    ->where('warehouse_id', $order->warehouse_id)
-                    ->firstOrFail();
-
-                if ($stock->stock < $item->count) {
-                    throw new OrderCompletionException(
-                        "Недостаточно товара {$item->product_id} на складе"
-                    );
-                }
-            }
-
-            // Списываем товары
-            foreach ($order->items as $item) {
-                Stock::where('product_id', $item->product_id)
-                    ->where('warehouse_id', $order->warehouse_id)
-                    ->decrement('stock', $item->count);
-            }
-
-            $order->update([
-                'status' => 'completed',
-                'completed_at' => now()
-            ]);
-        });
-
-        return new OrderResource($order->fresh());
+        return new OrderResource($order->fresh()->load('items.product'));
     }
 
     /**
-     * Отменить заказ
+     * Отмена заказа
      *
-     * Переводит заказ в статус 'canceled'.
-     * Если заказ был завершен - возвращает товары на склад.
-     *
-     * @param Order $order Модель заказа для отмены
-     * @return OrderResource Ресурс отмененного заказа
-     *
-     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
-     * @throws \App\Exceptions\OrderCancellationException При невозможности отменить заказ
-     *
-     * @response {
-     *   "data": {
-     *     "id": 1,
-     *     "status": "canceled",
-     *     ...
-     *   }
-     * }
+     * @param Order $order
+     * @return OrderResource
      */
     public function cancel(Order $order): OrderResource
     {
-        if (!in_array($order->status, ['active', 'completed'])) {
-            throw new OrderCancellationException('Можно отменять только активные или завершенные заказы');
-        }
-
-        DB::transaction(function () use ($order) {
-            // Возвращаем товары на склад, если заказ был завершен
-            if ($order->status === 'completed') {
-                foreach ($order->items as $item) {
-                    Stock::where('product_id', $item->product_id)
-                        ->where('warehouse_id', $order->warehouse_id)
-                        ->increment('stock', $item->count);
-                }
-            }
-
-            $order->update([
-                'status' => 'canceled',
-                'canceled_at' => now()
-            ]);
-        });
-
-        return new OrderResource($order->fresh());
+        $this->orderService->cancelOrder($order);
+        return new OrderResource($order->fresh()->load('items.product'));
     }
 
     /**
-     * Возобновить отмененный заказ
+     * Возобновление заказа
      *
-     * Переводит заказ из статуса 'canceled' в 'active' с проверкой:
-     * - Достаточно ли товаров на складе для возобновления
-     * - Заказ должен быть в статусе 'canceled'
-     *
-     * @param Order $order Модель заказа для возобновления
-     * @return OrderResource Ресурс возобновленного заказа
-     *
-     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
-     * @throws \App\Exceptions\OrderRestoreException При невозможности возобновить заказ
-     *
-     * @response 200 {
-     *   "data": {
-     *     "id": 1,
-     *     "status": "active",
-     *     "canceled_at": null,
-     *     ...
-     *   }
-     * }
-     * @response 400 {
-     *   "message": "Недостаточно товара на складе"
-     * }
+     * @param Order $order
+     * @return OrderResource
      */
     public function restore(Order $order): OrderResource
     {
-        // Основная проверка статуса
-        if ($order->status !== 'canceled') {
-            throw new OrderRestoreException('Можно возобновить только отмененные заказы');
-        }
-
-        // Проверка, что заказ не был завершен ранее
-        if ($order->completed_at) {
-            throw new OrderRestoreException('Нельзя возобновить ранее завершенный заказ');
-        }
-
-        // Проверка существования склада
-        if (!$order->warehouse) {
-            throw new OrderRestoreException('Связанный склад не найден');
-        }
-
-        DB::transaction(function () use ($order) {
-            // Проверяем наличие товаров перед возобновлением
-            foreach ($order->items as $item) {
-                $stock = Stock::where('product_id', $item->product_id)
-                    ->where('warehouse_id', $order->warehouse_id)
-                    ->firstOrFail();
-
-                if ($stock->stock < $item->count) {
-                    throw new OrderRestoreException(
-                        "Недостаточно товара {$item->product->name} на складе. Доступно: {$stock->stock}, требуется: {$item->count}"
-                    );
-                }
-            }
-
-            // Списываем товары со склада
-            foreach ($order->items as $item) {
-                Stock::where('product_id', $item->product_id)
-                    ->where('warehouse_id', $order->warehouse_id)
-                    ->decrement('stock', $item->count);
-            }
-
-            // Обновляем статус заказа
-            $order->update([
-                'status' => 'active',
-                'canceled_at' => null,
-                'completed_at' => null
-            ]);
-        });
-
+        $this->orderService->restoreOrder($order);
         return new OrderResource($order->fresh()->load('items.product'));
     }
 }
